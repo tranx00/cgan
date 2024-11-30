@@ -165,4 +165,4 @@ cython_debug/
 .Trash-0/
 dataset.rar
 dataset/
-model/
+models/

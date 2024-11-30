@@ -4,3 +4,4 @@ opencv-python
 seaborn
 scikit-learn
 pydot
+albumentations
