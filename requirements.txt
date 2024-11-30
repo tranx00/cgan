@@ -1,0 +1,6 @@
+natsort
+ipython-autotime
+opencv-python
+seaborn
+scikit-learn
+pydot
