@@ -3,5 +3,5 @@ ipython-autotime
 opencv-python
 seaborn
 scikit-learn
-pydot
+pydot==3.0.1
 albumentations
