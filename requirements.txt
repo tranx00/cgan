@@ -1,7 +1,8 @@
-natsort
+natsort==8.4.0
+pydantic
 ipython-autotime
-opencv-python
+opencv-python==4.10.0.84
 seaborn
 scikit-learn
 pydot==3.0.1
-albumentations
+albumentations==1.4.20
