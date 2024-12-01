@@ -5,6 +5,7 @@ import natsort
 import cv2
 import numpy as np
 import tensorflow as tf
+import albumentations as A
 from sklearn.model_selection import train_test_split
 
 class readDataset:
@@ -19,13 +20,13 @@ class readDataset:
         self.test_images = None
         self.test_masks = None
         
-        # Create output directories if they don't exist
-        os.makedirs(os.path.join(output_dir, 'images', 'train'), exist_ok=True)
-        os.makedirs(os.path.join(output_dir, 'images', 'val'), exist_ok=True)
-        os.makedirs(os.path.join(output_dir, 'images', 'test'), exist_ok=True)
-        os.makedirs(os.path.join(output_dir, 'masks', 'train'), exist_ok=True)
-        os.makedirs(os.path.join(output_dir, 'masks', 'val'), exist_ok=True)
-        os.makedirs(os.path.join(output_dir, 'masks', 'test'), exist_ok=True)
+        # Create output directories with the new structure
+        os.makedirs(os.path.join(output_dir, 'train', 'images'), exist_ok=True)
+        os.makedirs(os.path.join(output_dir, 'train', 'masks'), exist_ok=True)
+        os.makedirs(os.path.join(output_dir, 'val', 'images'), exist_ok=True)
+        os.makedirs(os.path.join(output_dir, 'val', 'masks'), exist_ok=True)
+        os.makedirs(os.path.join(output_dir, 'test', 'images'), exist_ok=True)
+        os.makedirs(os.path.join(output_dir, 'test', 'masks'), exist_ok=True)
         
     def readPathes(self,):
         self.images = natsort.natsorted(list(pathlib.Path(self.imagesPathes).glob('*.*')))
@@ -39,14 +40,14 @@ class readDataset:
         
     def readImages(self, data, typeData):
         images = []
-        height = 512
-        width = 1024
+        height = 256
+        width = 512
         for img in data:
             img_name = img.name
             img = cv2.imread(str(img), 0)
             img = cv2.resize(img, (width, height), interpolation=cv2.INTER_AREA)
             if typeData == 'm':
-                img = np.where(img > 0, 1, 0)            
+                img = np.where(img > 0, 1, 0)
             img = np.expand_dims(img, axis=-1)
             images.append(img)
         print("(INFO..) Read Image Done")
@@ -65,6 +66,23 @@ class readDataset:
         return np.array(normalized_images)
             
     def dataAugmentation(self, images, masks):
+        augmentation = A.Compose([
+            A.HorizontalFlip(p=1),
+            # Vertical Translation
+            A.ShiftScaleRotate(
+                shift_limit_x=0,
+                shift_limit_y=(-0.1, 0.05),
+                scale_limit=(-0.05, 0.05), 
+                rotate_limit=0,
+                interpolation=cv2.INTER_AREA,
+                mask_interpolation=cv2.INTER_AREA,
+                border_mode=cv2.BORDER_CONSTANT,
+                p=0.5,
+            ),
+            
+            A.RandomBrightnessContrast(p=0.5),
+        ], bbox_params=None)
+        
         if len(images) != len(masks):
             raise ValueError("Number of images and masks must be the same.")
 
@@ -72,64 +90,29 @@ class readDataset:
         augmented_masks = []
 
         for image, mask in zip(images, masks):
-            # Original images
+            # Original image and mask
             augmented_images.append(image)
             augmented_masks.append(mask)
 
-            # Horizontal Flip
-            flipped_image = tf.image.flip_left_right(image)
-            flipped_mask = tf.image.flip_left_right(mask)
-            augmented_images.append(flipped_image)
-            augmented_masks.append(flipped_mask)
-
-            # Random Contrast Adjustment
-            for _ in range(2):
-                # Generate random contrast factor between 0.5 and 1.5
-                contrast_factor = tf.random.uniform([], minval=0.5, maxval=1.5)
-                contrasted_image = tf.image.adjust_contrast(tf.cast(image, tf.float32), contrast_factor)
-                contrasted_image = tf.cast(contrasted_image, image.dtype)
-                augmented_images.append(contrasted_image)
-                augmented_masks.append(mask)
-
-            # Random Brightness Adjustment
-            for _ in range(2):
-                # Generate random brightness delta between -0.3 and 0.3
-                brightness_delta = tf.random.uniform([], minval=-0.3, maxval=0.3)
-                brightened_image = tf.image.adjust_brightness(tf.cast(image, tf.float32), delta=brightness_delta)
-                brightened_image = tf.cast(brightened_image, image.dtype)
-                augmented_images.append(brightened_image)
-                augmented_masks.append(mask)
+            # Perform augmentations
+            # Generate 6 augmented versions per image
+            for _ in range(6):
+                # Ensure image and mask are in the right format
+                # Squeeze if needed and ensure correct dimensionality
+                img = image.squeeze()
+                msk = mask.squeeze()
                 
-            # Random Vertical Translation
-            num_translations = 2  # Number of random translations
-            for _ in range(num_translations):
-                # Generate random translation between -50 and 50
-                shift = tf.random.uniform([], minval=-50, maxval=50, dtype=tf.int32).numpy()
+                # Handle single-channel images
+                if len(img.shape) == 2:
+                    img = np.expand_dims(img, axis=-1)
+                if len(msk.shape) == 2:
+                    msk = np.expand_dims(msk, axis=-1)
 
-                # Create a copy of the original image and mask
-                translated_image = image.copy().squeeze()
-                translated_mask = mask.copy().squeeze()
-
-                # Create a blank canvas with the same shape as the original image
-                canvas_image = np.zeros_like(translated_image)
-                canvas_mask = np.zeros_like(translated_mask)
-
-                # Determine shift direction
-                if shift > 0:
-                    # Shift down
-                    canvas_image[shift:, :] = translated_image[:-shift, :]
-                    canvas_mask[shift:, :] = translated_mask[:-shift, :]
-                else:
-                    # Shift up
-                    canvas_image[:translated_image.shape[0]+shift, :] = translated_image[-shift:, :]
-                    canvas_mask[:translated_mask.shape[0]+shift, :] = translated_mask[-shift:, :]
-
-                # Reshape and expand dimensions
-                canvas_image = np.expand_dims(canvas_image, axis=-1)
-                canvas_mask = np.expand_dims(canvas_mask, axis=-1)
-
-                augmented_images.append(canvas_image)
-                augmented_masks.append(canvas_mask)
+                # Apply augmentation
+                augmented = augmentation(image=img, mask=msk)
+                
+                augmented_images.append(augmented['image'])
+                augmented_masks.append(augmented['mask'])
 
         print("(INFO..) Augmentation Image Done")
         return np.array(augmented_images), np.array(augmented_masks)
@@ -140,13 +123,13 @@ class readDataset:
             img_filename = f"{split_type}_{i:04d}.png"
             mask_filename = f"{split_type}_{i:04d}_mask.png"
             
-            # Save paths
-            img_save_path = os.path.join(self.output_dir, 'images', split_type, img_filename)
-            mask_save_path = os.path.join(self.output_dir, 'masks', split_type, mask_filename)
+            # Save paths (updated directory structure)
+            img_save_path = os.path.join(self.output_dir, split_type, 'images', img_filename)
+            mask_save_path = os.path.join(self.output_dir, split_type, 'masks', mask_filename)
             
             # Save images (denormalize if needed)
             img_to_save = (img * 255).astype(np.uint8)
-            mask_to_save = (mask * 255).astype(np.uint8)
+            mask_to_save = (mask.squeeze() * 255).astype(np.uint8)
             
             cv2.imwrite(img_save_path, img_to_save)
             cv2.imwrite(mask_save_path, mask_to_save)
@@ -176,7 +159,7 @@ class readDataset:
 
 images_path = './dataset/images'
 masks_path = './dataset/masks'
-output_dir = './prepos_dataset'
+output_dir = './dataset/prepos_dataset'
     
 dataset = readDataset(images_path, masks_path, output_dir)
 dataset.readPathes()
