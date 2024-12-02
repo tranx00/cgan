@@ -10,6 +10,6 @@ def count_files_in_folder(folder_path, include_subfolders=True):
     return total_files
 
 
-folder_path = "./dataset/prepos_dataset/train/images"
+folder_path = "./dataset/masks"
 file_count = count_files_in_folder(folder_path, False)
 print(f"Total number of files: {file_count}")

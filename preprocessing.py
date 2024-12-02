@@ -123,7 +123,7 @@ class readDataset:
             img_filename = f"{split_type}_{i:04d}.png"
             mask_filename = f"{split_type}_{i:04d}_mask.png"
             
-            # Save paths (updated directory structure)
+            # Save paths
             img_save_path = os.path.join(self.output_dir, split_type, 'images', img_filename)
             mask_save_path = os.path.join(self.output_dir, split_type, 'masks', mask_filename)
             
