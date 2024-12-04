@@ -137,7 +137,7 @@ class augmentDataset:
             img_save_path = os.path.join(self.output_dir, split_type, 'images', img_filename)
             mask_save_path = os.path.join(self.output_dir, split_type, 'masks', mask_filename)
             
-            img_to_save = (img * 255).astype(np.uint8)
+            img_to_save = (img).astype(np.uint8)
             mask_to_save = (mask.squeeze() * 255).astype(np.uint8)
             
             cv2.imwrite(img_save_path, img_to_save)
@@ -187,10 +187,6 @@ class augmentDataset:
         
         # Augment train data
         train_images_aug, train_masks_aug = self.dataAugmentation(np.array(train_images), np.array(train_masks), n_augments=n_augments)
-        
-        train_images_aug = self.normalizeImages(train_images_aug)
-        val_images = self.normalizeImages(val_images)
-        test_image = self.normalizeImages(test_images)
         
         # Save augmented data
         self.saveData(train_images_aug, train_masks_aug, 'train')
