@@ -50,12 +50,15 @@ class augmentDataset:
             images.append(img)
         print("(INFO..) Read Image Done")
         return np.array(images)
-
+    
     def normalizeImages(self, images):
         normalized_images = []
+        # clahe = cv2.createCLAHE(clipLimit=1, tileGridSize=(3,3))
         for img in images:
             img = img.astype(np.uint8)
+            # img = clahe.apply(img)
             img = img / 255.
+            # img = np.expand_dims(img, axis=-1)
             normalized_images.append(img)
         print("(INFO..) Normalization Image Done")
         return np.array(normalized_images)
@@ -134,18 +137,17 @@ class augmentDataset:
             img_save_path = os.path.join(self.output_dir, split_type, 'images', img_filename)
             mask_save_path = os.path.join(self.output_dir, split_type, 'masks', mask_filename)
             
-            # Save images (denormalize if needed)
             img_to_save = (img * 255).astype(np.uint8)
             mask_to_save = (mask.squeeze() * 255).astype(np.uint8)
             
             cv2.imwrite(img_save_path, img_to_save)
             cv2.imwrite(mask_save_path, mask_to_save)
     
-    def splitDataset(self, images, masks, val_size=20, test_size=10, random_state=42):
+    def splitDataset(self, images, masks, val_size=20, test_size=10):
         # Only perform the split, return the split indices
         data = list(zip(images, masks))
-        train_data, test_data = train_test_split(data, test_size=(val_size + test_size), random_state=random_state)
-        val_data, test_data = train_test_split(test_data, test_size=(test_size / (val_size + test_size)), random_state=random_state)
+        train_data, test_data = train_test_split(data, test_size=(val_size + test_size), random_state=42)
+        val_data, test_data = train_test_split(test_data, test_size=(test_size / (val_size + test_size)), random_state=42)
 
         return {
             'train_data': train_data,
@@ -186,9 +188,9 @@ class augmentDataset:
         # Augment train data
         train_images_aug, train_masks_aug = self.dataAugmentation(np.array(train_images), np.array(train_masks), n_augments=n_augments)
         
-        train_images_aug = datasetObject.normalizeImages(train_images_aug)
-        valid_images = datasetObject.normalizeImages(valid_images)
-        test_images = datasetObject.normalizeImages(test_images)
+        train_images_aug = self.normalizeImages(train_images_aug)
+        val_images = self.normalizeImages(val_images)
+        test_image = self.normalizeImages(test_images)
         
         # Save augmented data
         self.saveData(train_images_aug, train_masks_aug, 'train')
@@ -200,6 +202,6 @@ class augmentDataset:
 images_path = './dataset/images'
 masks_path = './dataset/masks'
 output_dir = './dataset/prepos_dataset'
-    
+
 dataset = augmentDataset(images_path, masks_path, output_dir)
 dataset.main(width=1024, height=512, val_size=20, test_size=10, n_augments=7)
