@@ -66,11 +66,11 @@ class readDataset:
         return np.array(normalized_images)
             
     def dataAugmentation(self, images, masks):
-        augmentation = A.Compose([
-            A.HorizontalFlip(p=1),
+        augmentation = A.ReplayCompose([
+            A.HorizontalFlip(p=0.5),
             # Vertical Translation
             A.ShiftScaleRotate(
-                shift_limit_x=0,
+                shift_limit_x=(-0.05, 0.05),
                 shift_limit_y=(-0.1, 0.05),
                 scale_limit=(-0.05, 0.05), 
                 rotate_limit=0,
@@ -79,8 +79,15 @@ class readDataset:
                 border_mode=cv2.BORDER_CONSTANT,
                 p=0.5,
             ),
-            
-            A.RandomBrightnessContrast(p=0.5),
+            A.RandomGamma(p=0.5),
+            A.RandomBrightnessContrast(brightness_limit=(-0.25, 0.4),
+                                       contrast_limit=(-0.25, 0.35),
+                                       p=0.5),
+            A.ElasticTransform(alpha=10, 
+                               sigma=10, 
+                               interpolation=cv2.INTER_AREA,
+                               mask_interpolation=cv2.INTER_AREA,
+                               p=0.2)
         ], bbox_params=None)
         
         if len(images) != len(masks):
@@ -95,21 +102,22 @@ class readDataset:
             augmented_masks.append(mask)
 
             # Perform augmentations
-            # Generate 6 augmented versions per image
-            for _ in range(6):
+            # Generate n augmented versions per image
+            for _ in range(7):
                 # Ensure image and mask are in the right format
                 # Squeeze if needed and ensure correct dimensionality
-                img = image.squeeze()
-                msk = mask.squeeze()
+                
+                image = image.astype(np.uint8)
+                mask = mask.astype(np.uint8)
                 
                 # Handle single-channel images
-                if len(img.shape) == 2:
-                    img = np.expand_dims(img, axis=-1)
-                if len(msk.shape) == 2:
-                    msk = np.expand_dims(msk, axis=-1)
+                if len(image.shape) == 2:
+                    image = np.expand_dims(image, axis=-1)
+                if len(mask.shape) == 2:
+                    mask = np.expand_dims(mask, axis=-1)
 
                 # Apply augmentation
-                augmented = augmentation(image=img, mask=msk)
+                augmented = augmentation(image=image, mask=mask)
                 
                 augmented_images.append(augmented['image'])
                 augmented_masks.append(augmented['mask'])
@@ -134,7 +142,7 @@ class readDataset:
             cv2.imwrite(img_save_path, img_to_save)
             cv2.imwrite(mask_save_path, mask_to_save)
     
-    def splitDataset(self, images, masks, val_size=0.1, test_size=0.1, random_state=42):
+    def splitDataset(self, images, masks, val_size=20, test_size=10, random_state=42):
         data = list(zip(images, masks))
         train_data, test_data = train_test_split(data, test_size=(val_size + test_size), random_state=random_state)
         val_data, test_data = train_test_split(test_data, test_size=(test_size / (val_size + test_size)), random_state=random_state)
@@ -168,9 +176,5 @@ dataset.readPathes()
 images = dataset.readImages(dataset.images, 'i')
 masks = dataset.readImages(dataset.masks, 'm')
     
-# Normalize images
-normalized_images = dataset.normalizeImages(images)
-normalized_masks = dataset.normalizeImages(masks)
-    
 # Split and augment dataset
-dataset.splitDataset(normalized_images, normalized_masks)
+dataset.splitDataset(images, masks)
