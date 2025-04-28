@@ -6,3 +6,4 @@ seaborn
 scikit-learn==1.4.0
 pydot==3.0.1
 albumentations==1.4.20
+opendatasets
